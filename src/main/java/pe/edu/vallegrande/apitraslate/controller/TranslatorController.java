@@ -1,14 +1,13 @@
 package pe.edu.vallegrande.apitraslate.controller;
-import org.springframework.web.bind.annotation.*;
-import pe.edu.vallegrande.apitraslate.model.TranslateRequestBody;
-import pe.edu.vallegrande.apitraslate.model.Translation;
-import pe.edu.vallegrande.apitraslate.repository.TranslationRepository;
-import pe.edu.vallegrande.apitraslate.service.TranslatorService;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import pe.edu.vallegrande.apitraslate.model.Translation;
+import pe.edu.vallegrande.apitraslate.repository.TranslationRepository;
+import pe.edu.vallegrande.apitraslate.service.TranslatorService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -26,18 +25,14 @@ public class TranslatorController {
     }
 
     @PostMapping("/translate")
-    public Mono<ResponseEntity<String>> translateText(@RequestBody TranslateRequestBody requestBody) {
-        String text = requestBody.getText();
-        String from = requestBody.getFrom();
-        String to = requestBody.getTo();
+    public Mono<ResponseEntity<String>> translateText(@RequestBody Translation requestBody) {
+        String text = requestBody.getOriginalText();
+        String from = requestBody.getFromLanguage();
+        String to = requestBody.getToLanguage();
         return translatorService.translateText(text, from, to)
                 .flatMap(translatedText -> {
-                    Translation translation = new Translation();
-                    translation.setOriginalText(text);
-                    translation.setTranslatedText(translatedText);
-                    translation.setFromLanguage(from);
-                    translation.setToLanguage(to);
-                    return translationRepository.save(translation)
+                    requestBody.setTranslatedText(translatedText);
+                    return translationRepository.save(requestBody)
                             .map(savedTranslation -> ResponseEntity.status(HttpStatus.OK)
                                     .body("Translation saved successfully"));
                 })
@@ -48,23 +43,23 @@ public class TranslatorController {
                 });
     }
 
-
     @GetMapping("/translations/{id}")
     public Mono<ResponseEntity<Translation>> getTranslationById(@PathVariable Long id) {
         return translationRepository.findById(id)
                 .map(translation -> ResponseEntity.status(HttpStatus.OK).body(translation))
                 .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
+
     @GetMapping("/translations")
     public Flux<Translation> getAllTranslations() {
         return translationRepository.findAll();
     }
 
     @PutMapping("/translations/{id}")
-    public Mono<ResponseEntity<Translation>> updateTranslation(@PathVariable Long id, @RequestBody TranslateRequestBody requestBody) {
-        String text = requestBody.getText();
-        String from = requestBody.getFrom();
-        String to = requestBody.getTo();
+    public Mono<ResponseEntity<Translation>> updateTranslation(@PathVariable Long id, @RequestBody Translation updatedTranslation) {
+        String text = updatedTranslation.getOriginalText();
+        String from = updatedTranslation.getFromLanguage();
+        String to = updatedTranslation.getToLanguage();
         return translationRepository.findById(id)
                 .flatMap(existingTranslation -> translatorService.translateText(text, from, to)
                         .flatMap(translatedText -> {
@@ -74,7 +69,7 @@ public class TranslatorController {
                             existingTranslation.setToLanguage(to);
                             return translationRepository.save(existingTranslation);
                         }))
-                .map(updatedTranslation -> ResponseEntity.status(HttpStatus.OK).body(updatedTranslation))
+                .map(savedTranslation -> ResponseEntity.status(HttpStatus.OK).body(savedTranslation))
                 .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
@@ -87,5 +82,4 @@ public class TranslatorController {
                 )
                 .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
-
 }
